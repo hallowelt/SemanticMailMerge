@@ -38,9 +38,13 @@ class SemanticMailMerge_ResultFormat extends SMWTableResultPrinter {
 	 * @return array of IParamDefinition|array
 	 */
 	public function getParamDefinitions(array $definitions) {
+		error_log( __METHOD__ );
 		$params = parent::getParamDefinitions($definitions);
-		$def = new StringParam('template');
-		$params['template'] = $def;
+		$params['template'] = array(
+			'name' => 'template',
+			'message' => 'smw-paramdesc-template',
+			'default' => '',
+		);
 		return $params;
 	}
 
@@ -56,8 +60,11 @@ class SemanticMailMerge_ResultFormat extends SMWTableResultPrinter {
 		global $wgTitle;
 		$this->pageTitle = "$wgTitle";
 
-		$this->emailsTable = new SemanticMailMerge_ORM();
-		$this->emailsTable->delete(array('title' => $this->pageTitle));
+		$db = wfGetDB( DB_MASTER );
+		$db->delete(
+			'smw_mailmerge',
+			[ 'title' => $this->pageTitle ]
+		);
 
 		$results = clone $queryResult;
 		while ($row = $results->getNext()) {
@@ -87,11 +94,14 @@ class SemanticMailMerge_ResultFormat extends SMWTableResultPrinter {
 		if (isset($template_params['To']) && count($template_params['To'])>0) {
 			$data = array(
 				'title' => $this->pageTitle,
-				'params' => $template_params,
+				'params' => serialize( $template_params ),
 				'template' => $this->params['template'],
 			);
-			$row = $this->emailsTable->newRow($data);
-			$row->save();
+			$db = wfGetDB( DB_MASTER );
+			$db->insert(
+				'smw_mailmerge',
+				$data
+			);
 		}
 
 	}

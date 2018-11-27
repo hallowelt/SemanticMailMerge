@@ -41,25 +41,36 @@ class SemanticMailMerge_Sender extends Maintenance {
 	 */
 	public function execute() {
 		$this->title = Title::newFromText($this->getOption('title'));
-		$emails = new SemanticMailMerge_ORM();
-		$emailsResult = $emails->select(null, array('title' => "$this->title"));
-		foreach ($emailsResult as $emailResult) {
+		$emailsResult = $this->getEmails();
+		foreach ( $emailsResult as $emailResult ) {
 			$email = $this->prepareTemplate($emailResult);
 			$this->sendMail($email['recipients'], $email['message']);
 		}
 		return true;
 	}
 
+	protected function getEmails() {
+		$db = wfGetDB( DB_SLAVE );
+		$res = $db->select(
+			'smw_mailmerge',
+			'*',
+			[ 'title' => $this->title->getPrefixedText() ]
+		);
+
+		return $res;
+	}
+
 	/**
 	 * Get HTML email message and list of email recipients from given email
 	 * info.
 	 *
-	 * @param ORMRow $emailInfo
+	 * @param stdClass $emailInfo
 	 * @return array With 'message' and 'recipients' items.
 	 */
 	protected function prepareTemplate($emailInfo) {
-		$template = $emailInfo->getField('template');
-		$params = $emailInfo->getField('params');
+		$template = $emailInfo->template;
+		$params = unserialize( $emailInfo->params );
+
 		$fauxreq = new FauxRequest(array(
 			'action' => 'parse',
 			'text' => $this->getTemplate($template, $params),
@@ -67,12 +78,12 @@ class SemanticMailMerge_Sender extends Maintenance {
 		));
 		$api = new ApiMain($fauxreq);
 		$api->execute();
-		$data = $api->getResultData();
-		$message = $data['parse']['text']['*'];
+		$data = $api->getResult()->getResultData();
+		$message = $data['parse']['text'];
 
 		$recipients = array();
-		foreach ($params['To'] as $to) {
-			$recipients[] = new MailAddress($to);
+		foreach ($params['To'] as $to ) {
+			$recipients[] = new MailAddress( $to );
 		}
 
 		return array('message'=>$message, 'recipients'=>$recipients);
@@ -102,6 +113,7 @@ class SemanticMailMerge_Sender extends Maintenance {
 	 * Send an email to one or more recipients.
 	 * Outputs an error if email does not send.
 	 *
+	 * @param \MailAddress[] $recipients
 	 * @uses UserMailer::send() To actually send the mail.
 	 * @global string $wgPasswordSender
 	 */
@@ -109,7 +121,7 @@ class SemanticMailMerge_Sender extends Maintenance {
 		global $wgPasswordSender;
 		$from = new MailAddress( $wgPasswordSender );
 		$subject = "$this->title";
-		$status = UserMailer::send( $recipients, $from, $subject, $message, $from, 'text/html; charset=UTF-8' );
+		$status = UserMailer::send( $recipients, $from, $subject, $message, [ 'contentType' => 'text/html; charset=UTF-8' ] );
 		if ( ! $status->isGood()) {
 			$this->error( $status->getWikiText() );
 		}
