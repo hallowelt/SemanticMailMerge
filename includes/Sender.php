@@ -27,7 +27,7 @@ class SemanticMailMerge_Sender extends Maintenance {
 	private $title;
 
 	/**
-	 * 
+	 *
 	 */
 	public function __construct() {
 		parent::__construct();
@@ -40,13 +40,23 @@ class SemanticMailMerge_Sender extends Maintenance {
 	 * @return boolean true
 	 */
 	public function execute() {
-		$this->title = Title::newFromText($this->getOption('title'));
+		$title = str_replace( "\\", "/", $this->getOption( 'title' ) );
+		$this->title = Title::newFromText( $title );
+		if ( !( $this->title instanceof \Title ) || !$this->title->exists() ) {
+			return true;
+		}
+		$this->purgeTitle();
 		$emailsResult = $this->getEmails();
 		foreach ( $emailsResult as $emailResult ) {
 			$email = $this->prepareTemplate($emailResult);
 			$this->sendMail($email['recipients'], $email['message']);
 		}
 		return true;
+	}
+
+	protected function purgeTitle() {
+		$wikipage = WikiPage::factory( $this->title );
+		$wikipage->doPurge();
 	}
 
 	protected function getEmails() {
@@ -56,7 +66,7 @@ class SemanticMailMerge_Sender extends Maintenance {
 			'*',
 			[ 'title' => $this->title->getPrefixedText() ]
 		);
-
+		print ( $res->numRows() );
 		return $res;
 	}
 
@@ -71,15 +81,13 @@ class SemanticMailMerge_Sender extends Maintenance {
 		$template = $emailInfo->template;
 		$params = unserialize( $emailInfo->params );
 
-		$fauxreq = new FauxRequest(array(
-			'action' => 'parse',
-			'text' => $this->getTemplate($template, $params),
-			'contentmodel'=>'wikitext',
-		));
-		$api = new ApiMain($fauxreq);
-		$api->execute();
-		$data = $api->getResult()->getResultData();
-		$message = $data['parse']['text'];
+		$text = $this->getTemplate( $template, $params );
+		$parser = new Parser();
+		$message = $parser->parse(
+			$text,
+			$this->title,
+			new ParserOptions()
+		)->getText();
 
 		$recipients = array();
 		foreach ($params['To'] as $to ) {
