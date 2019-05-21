@@ -66,7 +66,6 @@ class SemanticMailMerge_Sender extends Maintenance {
 			'*',
 			[ 'title' => $this->title->getPrefixedText() ]
 		);
-		print ( $res->numRows() );
 		return $res;
 	}
 
