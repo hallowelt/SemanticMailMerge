@@ -1,0 +1,21 @@
+{
+  "name": "SemanticMailMerge",
+  "version": "1.0",
+  "author": [
+    "Sam Wilson", "Dejan Savuljesku"
+  ],
+  "url": "https://www.mediawiki.org/wiki/Extension:SemanticMailMerge",
+  "descriptionmsg": "semanticmailmerge-desc",
+  "license-name": "GPL-2.0-or-later",
+  "type": "other",
+  "MessagesDirs": {
+    "SemanticMailMerge": [
+      "i18n"
+    ]
+  },
+  "AutoloadNamespaces": {
+    "MediaWiki\\Extension\\SemanticMailMerge\\" : "/src"
+  },
+  "callback": "MediaWiki\\Extension\\SemanticMailMerge\\Extension::registration",
+  "manifest_version": 2
+}
